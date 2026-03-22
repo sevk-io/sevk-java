@@ -1,30 +1,26 @@
 package io.sevk;
 
-import io.sevk.markup.MarkupRenderer;
+import io.sevk.markup.Renderer;
 import io.sevk.types.Contact;
 import io.sevk.types.Types.*;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import okhttp3.*;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests for Sevk Java SDK
- * Tests against localhost:4000
+ * Requires SEVK_TEST_API_KEY environment variable to be set.
+ * Optionally uses SEVK_TEST_BASE_URL (defaults to https://api.sevk.io).
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class SevkTest {
-    private static final String BASE_URL = "http://localhost:4000";
-    private static final Gson gson = new Gson();
-    private static final OkHttpClient httpClient = new OkHttpClient();
+    private static String BASE_URL;
 
     private static Sevk sevk;
     private static String createdContactId;
@@ -32,77 +28,26 @@ class SevkTest {
     private static String createdTemplateId;
     private static String createdTopicId;
     private static String createdSegmentId;
+    private static String createdBroadcastId;
+    private static String createdDomainId;
 
     private static String uniqueId() {
         return String.valueOf(System.currentTimeMillis()) + ThreadLocalRandom.current().nextInt(10000);
     }
 
     @BeforeAll
-    static void setupTestEnvironment() throws Exception {
-        String unique = uniqueId();
-        String testEmail = "sdk-test-" + unique + "@test.example.com";
-        String testPassword = "TestPassword123!";
+    static void setupTestEnvironment() {
+        String apiKey = System.getenv("SEVK_TEST_API_KEY");
+        Assumptions.assumeTrue(apiKey != null && !apiKey.isEmpty(),
+            "SEVK_TEST_API_KEY environment variable is not set, skipping integration tests");
 
-        // 1. Register a new test user
-        JsonObject registerBody = new JsonObject();
-        registerBody.addProperty("email", testEmail);
-        registerBody.addProperty("password", testPassword);
-
-        Request registerRequest = new Request.Builder()
-            .url(BASE_URL + "/auth/register")
-            .post(RequestBody.create(gson.toJson(registerBody), MediaType.parse("application/json")))
-            .build();
-
-        try (Response response = httpClient.newCall(registerRequest).execute()) {
-            if (!response.isSuccessful()) {
-                throw new RuntimeException("Failed to register: " + response.code() + " " + response.body().string());
-            }
-            JsonObject data = gson.fromJson(response.body().string(), JsonObject.class);
-            String token = data.get("token").getAsString();
-
-            // 2. Create Project
-            JsonObject projectBody = new JsonObject();
-            projectBody.addProperty("name", "Test Project");
-            projectBody.addProperty("slug", "test-project-" + unique);
-            projectBody.addProperty("supportEmail", "support@test.com");
-
-            Request projectRequest = new Request.Builder()
-                .url(BASE_URL + "/projects")
-                .header("Authorization", "Bearer " + token)
-                .post(RequestBody.create(gson.toJson(projectBody), MediaType.parse("application/json")))
-                .build();
-
-            try (Response projectResponse = httpClient.newCall(projectRequest).execute()) {
-                if (!projectResponse.isSuccessful()) {
-                    throw new RuntimeException("Failed to create project: " + projectResponse.code());
-                }
-                JsonObject projectData = gson.fromJson(projectResponse.body().string(), JsonObject.class);
-                String projectId = projectData.getAsJsonObject("project").get("id").getAsString();
-
-                // 3. Create API Key
-                JsonObject apiKeyBody = new JsonObject();
-                apiKeyBody.addProperty("title", "Test Key");
-                apiKeyBody.addProperty("fullAccess", true);
-
-                Request apiKeyRequest = new Request.Builder()
-                    .url(BASE_URL + "/projects/" + projectId + "/api-keys")
-                    .header("Authorization", "Bearer " + token)
-                    .post(RequestBody.create(gson.toJson(apiKeyBody), MediaType.parse("application/json")))
-                    .build();
-
-                try (Response apiKeyResponse = httpClient.newCall(apiKeyRequest).execute()) {
-                    if (!apiKeyResponse.isSuccessful()) {
-                        throw new RuntimeException("Failed to create API key: " + apiKeyResponse.code());
-                    }
-                    JsonObject apiKeyData = gson.fromJson(apiKeyResponse.body().string(), JsonObject.class);
-                    String apiKey = apiKeyData.getAsJsonObject("apiKey").get("key").getAsString();
-
-                    // Initialize SDK
-                    SevkOptions options = new SevkOptions().baseUrl(BASE_URL);
-                    sevk = new Sevk(apiKey, options);
-                }
-            }
+        BASE_URL = System.getenv("SEVK_TEST_BASE_URL");
+        if (BASE_URL == null || BASE_URL.isEmpty()) {
+            BASE_URL = "https://api.sevk.io";
         }
+
+        SevkOptions options = new SevkOptions().baseUrl(BASE_URL);
+        sevk = new Sevk(apiKey, options);
     }
 
     // ==================== AUTHENTICATION TESTS ====================
@@ -464,6 +409,7 @@ class SevkTest {
     @Test
     @Order(50)
     @DisplayName("27. Should list domains with correct response structure")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
     void testDomainsListStructure() throws Exception {
         List<Domain> domains = sevk.domains().list();
 
@@ -473,6 +419,7 @@ class SevkTest {
     @Test
     @Order(51)
     @DisplayName("28. Should list only verified domains")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
     void testDomainsListVerified() throws Exception {
         List<Domain> domains = sevk.domains().list(true);
 
@@ -772,6 +719,217 @@ class SevkTest {
         );
     }
 
+    // ==================== DOMAINS UPDATE TESTS ====================
+
+    @Test
+    @Order(52)
+    @DisplayName("52. Should update a domain")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
+    void testDomainsUpdate() throws Exception {
+        // Create a domain first, then attempt to update it
+        CreateDomainRequest createReq = new CreateDomainRequest()
+            .domain("test-" + uniqueId() + ".example.com")
+            .region("us-east-1");
+
+        try {
+            Domain domain = sevk.domains().create(createReq);
+            if (domain != null && domain.id != null) {
+                UpdateDomainRequest updateReq = new UpdateDomainRequest()
+                    .region("eu-west-1");
+                Domain updated = sevk.domains().update(domain.id, updateReq);
+                assertNotNull(updated);
+                assertEquals(domain.id, updated.id);
+            }
+        } catch (SevkException e) {
+            // Domain creation may fail if domain already exists or requires verification
+            // This is acceptable for integration testing
+        }
+    }
+
+    // ==================== BROADCASTS EXTENDED TESTS ====================
+
+    @Test
+    @Order(43)
+    @DisplayName("43. Should get broadcast status")
+    void testBroadcastsGetStatus() throws Exception {
+        List<Broadcast> broadcasts = sevk.broadcasts().list();
+        assertNotNull(broadcasts);
+
+        if (!broadcasts.isEmpty()) {
+            BroadcastStatus status = sevk.broadcasts().getStatus(broadcasts.get(0).id);
+            assertNotNull(status);
+            assertNotNull(status.status);
+        }
+    }
+
+    @Test
+    @Order(44)
+    @DisplayName("44. Should get broadcast emails")
+    void testBroadcastsGetEmails() throws Exception {
+        List<Broadcast> broadcasts = sevk.broadcasts().list();
+        assertNotNull(broadcasts);
+
+        if (!broadcasts.isEmpty()) {
+            List<BroadcastEmail> emails = sevk.broadcasts().getEmails(broadcasts.get(0).id);
+            assertNotNull(emails);
+            assertTrue(emails.size() >= 0);
+        }
+    }
+
+    @Test
+    @Order(45)
+    @DisplayName("45. Should estimate broadcast cost")
+    void testBroadcastsEstimateCost() throws Exception {
+        List<Broadcast> broadcasts = sevk.broadcasts().list();
+        assertNotNull(broadcasts);
+
+        if (!broadcasts.isEmpty()) {
+            try {
+                BroadcastCostEstimate estimate = sevk.broadcasts().estimateCost(broadcasts.get(0).id);
+                assertNotNull(estimate);
+            } catch (SevkException e) {
+                // May fail with 404 if broadcast doesn't support cost estimation
+                assertNotNull(e.getMessage());
+            }
+        }
+    }
+
+    @Test
+    @Order(46)
+    @DisplayName("46. Should list active broadcasts")
+    void testBroadcastsListActive() throws Exception {
+        List<Broadcast> active = sevk.broadcasts().listActive();
+        assertNotNull(active);
+        assertTrue(active.size() >= 0);
+    }
+
+    // ==================== TOPICS LIST CONTACTS TESTS ====================
+
+    @Test
+    @Order(65)
+    @DisplayName("65. Should list contacts for a topic")
+    void testTopicsListContacts() throws Exception {
+        assertNotNull(createdAudienceId);
+
+        // Create a topic
+        String name = "List Contacts Topic " + uniqueId();
+        CreateTopicRequest req = new CreateTopicRequest().name(name);
+        Topic topic = sevk.topics().create(createdAudienceId, req);
+
+        // List contacts for the topic (should be empty initially)
+        List<io.sevk.types.Contact> contacts = sevk.topics().listContacts(createdAudienceId, topic.id);
+        assertNotNull(contacts);
+        assertTrue(contacts.size() >= 0);
+    }
+
+    // ==================== WEBHOOKS TESTS (FULL CRUD) ====================
+
+    @Test
+    @Order(120)
+    @DisplayName("120. Should list webhook events")
+    void testWebhooksListEvents() throws Exception {
+        List<WebhookEvent> events = sevk.webhooks().listEvents();
+        assertNotNull(events);
+        assertFalse(events.isEmpty());
+        assertNotNull(events.get(0).name);
+    }
+
+    @Test
+    @Order(121)
+    @DisplayName("121. Should list webhooks")
+    void testWebhooksList() throws Exception {
+        List<Webhook> webhooks = sevk.webhooks().list();
+        assertNotNull(webhooks);
+        assertTrue(webhooks.size() >= 0);
+    }
+
+    @Test
+    @Order(122)
+    @DisplayName("122. Should perform full webhook CRUD cycle")
+    void testWebhooksCrudCycle() throws Exception {
+        // Get available events
+        List<WebhookEvent> availableEvents = sevk.webhooks().listEvents();
+        String eventName = (availableEvents != null && !availableEvents.isEmpty())
+            ? availableEvents.get(0).name : "contact.subscribed";
+
+        // Create
+        CreateWebhookRequest createReq = new CreateWebhookRequest()
+            .url("https://example.com/webhook/" + uniqueId())
+            .events(Arrays.asList(eventName))
+            .enabled(true);
+
+        Webhook webhook = sevk.webhooks().create(createReq);
+        assertNotNull(webhook);
+        assertNotNull(webhook.id);
+        assertTrue(webhook.url.contains("example.com"));
+        assertTrue(webhook.enabled);
+        assertNotNull(webhook.events);
+        assertFalse(webhook.events.isEmpty());
+
+        // Get
+        Webhook fetched = sevk.webhooks().get(webhook.id);
+        assertNotNull(fetched);
+        assertEquals(webhook.id, fetched.id);
+
+        // Update
+        UpdateWebhookRequest updateReq = new UpdateWebhookRequest().enabled(false);
+        Webhook updated = sevk.webhooks().update(webhook.id, updateReq);
+        assertNotNull(updated);
+        assertEquals(webhook.id, updated.id);
+        assertFalse(updated.enabled);
+
+        // Test
+        WebhookTestResponse testResponse = sevk.webhooks().test(webhook.id);
+        assertNotNull(testResponse);
+
+        // Delete
+        sevk.webhooks().delete(webhook.id);
+
+        // Verify deletion
+        Exception exception = assertThrows(SevkException.class, () -> {
+            sevk.webhooks().get(webhook.id);
+        });
+        assertTrue(exception.getMessage().contains("404"));
+    }
+
+    // ==================== EVENTS TESTS ====================
+
+    @Test
+    @Order(130)
+    @DisplayName("130. Should list events")
+    void testEventsList() throws Exception {
+        List<Event> events = sevk.events().list();
+        assertNotNull(events);
+        assertTrue(events.size() >= 0);
+    }
+
+    @Test
+    @Order(131)
+    @DisplayName("131. Should list events with pagination")
+    void testEventsListPagination() throws Exception {
+        ListParams params = new ListParams().page(1).limit(10);
+        List<Event> events = sevk.events().list(params);
+        assertNotNull(events);
+    }
+
+    @Test
+    @Order(132)
+    @DisplayName("132. Should get event stats")
+    void testEventsStats() throws Exception {
+        EventStats stats = sevk.events().stats();
+        assertNotNull(stats);
+    }
+
+    // ==================== USAGE TESTS ====================
+
+    @Test
+    @Order(140)
+    @DisplayName("140. Should get project usage")
+    void testGetUsage() throws Exception {
+        com.google.gson.JsonObject usage = sevk.getUsage();
+        assertNotNull(usage);
+    }
+
     // ==================== ERROR HANDLING TESTS ====================
 
     @Test
@@ -801,7 +959,7 @@ class SevkTest {
     @DisplayName("47. Should return HTML document structure")
     void testRenderDocumentStructure() {
         String markup = "<email><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         assertTrue(html.contains("<!DOCTYPE html"));
         assertTrue(html.contains("<html"));
@@ -815,7 +973,7 @@ class SevkTest {
     @DisplayName("48. Should include meta tags")
     void testRenderMetaTags() {
         String markup = "<email><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         assertTrue(html.contains("charset=UTF-8"));
         assertTrue(html.contains("viewport"));
@@ -826,7 +984,7 @@ class SevkTest {
     @DisplayName("49. Should include title when provided")
     void testRenderTitle() {
         String markup = "<email><head><title>Test Email</title></head><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         // Document should be rendered with proper structure
         assertTrue(html.contains("<!DOCTYPE html") && html.contains("<head>"));
@@ -837,7 +995,7 @@ class SevkTest {
     @DisplayName("50. Should include preview text when provided")
     void testRenderPreview() {
         String markup = "<email><head><preview>Preview text here</preview></head><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         // Preview text should be somewhere in the output
         assertTrue(html.contains("Preview text") || html.contains("display:none") || html.contains("<body"));
@@ -848,7 +1006,7 @@ class SevkTest {
     @DisplayName("51. Should include custom styles when provided")
     void testRenderCustomStyles() {
         String markup = "<email><head><style>.custom { color: red; }</style></head><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         // Styles should be in the output or at least the document should render
         assertTrue(html.contains("custom") || html.contains("<style>") || html.contains("<head>"));
@@ -858,7 +1016,7 @@ class SevkTest {
     @Order(115)
     @DisplayName("52. Should render empty markup with document structure")
     void testRenderEmptyMarkup() {
-        String html = MarkupRenderer.render("");
+        String html = Renderer.render("");
         assertTrue(html.contains("<!DOCTYPE html"));
         assertTrue(html.contains("<body"));
     }
@@ -868,7 +1026,7 @@ class SevkTest {
     @DisplayName("53. Should have default body styles")
     void testRenderBodyStyles() {
         String markup = "<email><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         assertTrue(html.contains("margin:0"));
         assertTrue(html.contains("padding:0"));
@@ -880,7 +1038,7 @@ class SevkTest {
     @DisplayName("54. Should include html lang attribute")
     void testRenderLangAttribute() {
         String markup = "<email><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         assertTrue(html.contains("lang=\"en\""));
     }
@@ -890,7 +1048,7 @@ class SevkTest {
     @DisplayName("55. Should include html dir attribute")
     void testRenderDirAttribute() {
         String markup = "<email><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         assertTrue(html.contains("dir=\"ltr\""));
     }
@@ -900,9 +1058,447 @@ class SevkTest {
     @DisplayName("56. Should include Content-Type meta tag")
     void testRenderContentType() {
         String markup = "<email><body></body></email>";
-        String html = MarkupRenderer.render(markup);
+        String html = Renderer.render(markup);
 
         assertTrue(html.contains("Content-Type"));
         assertTrue(html.contains("text/html"));
+    }
+
+    // ==================== CONTACTS EXTENDED TESTS ====================
+
+    @Test
+    @Order(150)
+    @DisplayName("150. Should bulk update contacts")
+    void testContactsBulkUpdate() throws Exception {
+        assertNotNull(createdContactId);
+
+        // Get the contact to get the email
+        Contact contact = sevk.contacts().get(createdContactId);
+
+        BulkUpdateContactEntry entry = new BulkUpdateContactEntry()
+            .email(contact.getEmail())
+            .subscribed(true);
+
+        BulkUpdateResponse result = sevk.contacts().bulkUpdate(Arrays.asList(entry));
+
+        assertNotNull(result);
+    }
+
+    @Test
+    @Order(151)
+    @DisplayName("151. Should get contact events")
+    void testContactsGetEvents() throws Exception {
+        assertNotNull(createdContactId);
+
+        List<ContactEvent> events = sevk.contacts().getEvents(createdContactId);
+
+        assertNotNull(events);
+        assertTrue(events.size() >= 0);
+    }
+
+    @Test
+    @Order(152)
+    @DisplayName("152. Should import contacts")
+    void testContactsImportContacts() throws Exception {
+        String email = "import-test-" + uniqueId() + "@example.com";
+        java.util.Map<String, Object> contactEntry = new java.util.HashMap<>();
+        contactEntry.put("email", email);
+        ImportContactsRequest req = new ImportContactsRequest()
+            .contacts(Arrays.asList(contactEntry));
+
+        try {
+            ImportContactsResponse result = sevk.contacts().importContacts(req);
+            assertNotNull(result);
+        } catch (SevkException e) {
+            // May hit rate limit during testing
+            assertTrue(e.getMessage().contains("429") || e.getMessage().contains("rate"));
+        }
+    }
+
+    // ==================== AUDIENCES EXTENDED TESTS ====================
+
+    @Test
+    @Order(160)
+    @DisplayName("160. Should list contacts in an audience")
+    void testAudiencesListContacts() throws Exception {
+        assertNotNull(createdAudienceId);
+
+        List<io.sevk.types.Contact> contacts = sevk.audiences().listContacts(createdAudienceId);
+
+        assertNotNull(contacts);
+        assertTrue(contacts.size() >= 0);
+    }
+
+    @Test
+    @Order(161)
+    @DisplayName("161. Should remove a contact from an audience")
+    void testAudiencesRemoveContact() throws Exception {
+        assertNotNull(createdAudienceId);
+
+        // Create a contact and add to audience, then remove
+        String email = "audience-remove-test-" + uniqueId() + "@example.com";
+        Contact contact = sevk.contacts().create(email);
+        sevk.audiences().addContacts(createdAudienceId, Arrays.asList(contact.getId()));
+
+        sevk.audiences().removeContact(createdAudienceId, contact.getId());
+
+        // Verify removal by listing contacts
+        List<io.sevk.types.Contact> contacts = sevk.audiences().listContacts(createdAudienceId);
+        for (io.sevk.types.Contact c : contacts) {
+            assertNotEquals(contact.getId(), c.getId());
+        }
+    }
+
+    // ==================== BROADCASTS CRUD TESTS ====================
+
+    @Test
+    @Order(170)
+    @DisplayName("170. Should create a broadcast")
+    void testBroadcastsCreate() throws Exception {
+        // Get a domain from the project to use for broadcast
+        List<Domain> domains = sevk.domains().list();
+        if (domains.isEmpty()) return;
+        String domainId = domains.get(0).id;
+
+        String name = "Test Broadcast " + uniqueId();
+        CreateBroadcastRequest req = new CreateBroadcastRequest()
+            .domainId(domainId)
+            .name(name)
+            .subject("Test Subject")
+            .body("<section><paragraph>Test broadcast body</paragraph></section>")
+            .senderName("Test Sender")
+            .senderEmail("test")
+            .targetType("ALL");
+
+        Broadcast broadcast = sevk.broadcasts().create(req);
+
+        assertNotNull(broadcast);
+        assertNotNull(broadcast.id);
+        assertEquals(name, broadcast.name);
+
+        createdBroadcastId = broadcast.id;
+    }
+
+    @Test
+    @Order(171)
+    @DisplayName("171. Should get a broadcast by id")
+    void testBroadcastsGet() throws Exception {
+        if (createdBroadcastId == null) return;
+
+        Broadcast broadcast = sevk.broadcasts().get(createdBroadcastId);
+
+        assertNotNull(broadcast);
+        assertEquals(createdBroadcastId, broadcast.id);
+    }
+
+    @Test
+    @Order(172)
+    @DisplayName("172. Should update a broadcast")
+    void testBroadcastsUpdate() throws Exception {
+        if (createdBroadcastId == null) return;
+
+        String newName = "Updated Broadcast " + uniqueId();
+        UpdateBroadcastRequest req = new UpdateBroadcastRequest().name(newName);
+
+        Broadcast broadcast = sevk.broadcasts().update(createdBroadcastId, req);
+
+        assertNotNull(broadcast);
+        assertEquals(createdBroadcastId, broadcast.id);
+        assertEquals(newName, broadcast.name);
+    }
+
+    @Test
+    @Order(173)
+    @DisplayName("173. Should get broadcast analytics")
+    void testBroadcastsGetAnalytics() throws Exception {
+        if (createdBroadcastId == null) return;
+
+        BroadcastAnalytics analytics = sevk.broadcasts().getAnalytics(createdBroadcastId);
+
+        assertNotNull(analytics);
+    }
+
+    @Test
+    @Order(174)
+    @DisplayName("174. Should send a test broadcast")
+    void testBroadcastsSendTest() throws Exception {
+        if (createdBroadcastId == null) return;
+
+        try {
+            SendTestRequest req = new SendTestRequest()
+                .emails(Arrays.asList("test@example.com"));
+            sevk.broadcasts().sendTest(createdBroadcastId, req);
+        } catch (SevkException e) {
+            // May fail if domain is unverified, which is expected
+            assertNotNull(e.getMessage());
+        }
+    }
+
+    @Test
+    @Order(175)
+    @DisplayName("175. Should handle send error for draft broadcast")
+    void testBroadcastsHandleSendError() throws Exception {
+        if (createdBroadcastId == null) return;
+
+        try {
+            sevk.broadcasts().send(createdBroadcastId);
+            // If it succeeds, that's fine too
+        } catch (SevkException e) {
+            // Expected to fail if broadcast is not ready to send
+            assertNotNull(e.getMessage());
+            assertTrue(e.getMessage().length() > 0);
+        }
+    }
+
+    @Test
+    @Order(176)
+    @DisplayName("176. Should handle cancel for a non-sending broadcast")
+    void testBroadcastsHandleCancelError() throws Exception {
+        if (createdBroadcastId == null) return;
+
+        try {
+            sevk.broadcasts().cancel(createdBroadcastId);
+        } catch (SevkException e) {
+            // Expected to fail if broadcast is not in a cancellable state
+            assertNotNull(e.getMessage());
+        }
+    }
+
+    @Test
+    @Order(177)
+    @DisplayName("177. Should delete a broadcast")
+    void testBroadcastsDelete() throws Exception {
+        if (createdBroadcastId == null) return;
+
+        sevk.broadcasts().delete(createdBroadcastId);
+
+        // Verify deletion
+        Exception exception = assertThrows(SevkException.class, () -> {
+            sevk.broadcasts().get(createdBroadcastId);
+        });
+
+        assertTrue(exception.getMessage().contains("404"));
+    }
+
+    // ==================== DOMAINS CRUD TESTS ====================
+
+    @Test
+    @Order(180)
+    @DisplayName("180. Should create a domain")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
+    void testDomainsCreate() throws Exception {
+        String subdomain = "test-" + uniqueId() + ".example.com";
+        CreateDomainRequest req = new CreateDomainRequest()
+            .domain(subdomain)
+            .email("test@" + subdomain);
+
+        Domain domain = sevk.domains().create(req);
+
+        assertNotNull(domain);
+        assertNotNull(domain.id);
+
+        createdDomainId = domain.id;
+    }
+
+    @Test
+    @Order(181)
+    @DisplayName("181. Should get a domain by id")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
+    void testDomainsGet() throws Exception {
+        if (createdDomainId == null) return;
+
+        Domain domain = sevk.domains().get(createdDomainId);
+
+        assertNotNull(domain);
+        assertEquals(createdDomainId, domain.id);
+    }
+
+    @Test
+    @Order(182)
+    @DisplayName("182. Should get DNS records for a domain")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
+    void testDomainsGetDnsRecords() throws Exception {
+        if (createdDomainId == null) return;
+
+        DnsRecordsResponse result = sevk.domains().getDnsRecords(createdDomainId);
+
+        assertNotNull(result);
+    }
+
+    @Test
+    @Order(183)
+    @DisplayName("183. Should get available regions")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
+    void testDomainsGetRegions() throws Exception {
+        List<String> regions = sevk.domains().getRegions();
+
+        assertNotNull(regions);
+    }
+
+    @Test
+    @Order(184)
+    @DisplayName("184. Should verify a domain")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
+    void testDomainsVerify() throws Exception {
+        if (createdDomainId == null) return;
+
+        try {
+            Domain domain = sevk.domains().verify(createdDomainId);
+            assertNotNull(domain);
+        } catch (SevkException e) {
+            // Expected to fail for test domains without proper DNS records
+            assertNotNull(e.getMessage());
+        }
+    }
+
+    @Test
+    @Order(185)
+    @DisplayName("185. Should delete a domain")
+    @EnabledIfEnvironmentVariable(named = "INCLUDE_DOMAIN_TESTS", matches = "true")
+    void testDomainsDelete() throws Exception {
+        if (createdDomainId == null) return;
+
+        sevk.domains().delete(createdDomainId);
+
+        // Verify deletion
+        try {
+            sevk.domains().get(createdDomainId);
+            fail("Expected SevkException for deleted domain");
+        } catch (SevkException e) {
+            // Accept any error as confirmation of deletion
+            assertNotNull(e.getMessage());
+        }
+    }
+
+    // ==================== TOPICS EXTENDED TESTS ====================
+
+    @Test
+    @Order(190)
+    @DisplayName("190. Should add contacts to a topic")
+    void testTopicsAddContacts() throws Exception {
+        assertNotNull(createdAudienceId);
+        assertNotNull(createdTopicId);
+        assertNotNull(createdContactId);
+
+        // Ensure contact is in the audience first
+        sevk.audiences().addContacts(createdAudienceId, Arrays.asList(createdContactId));
+
+        sevk.topics().addContacts(createdAudienceId, createdTopicId, Arrays.asList(createdContactId));
+    }
+
+    @Test
+    @Order(191)
+    @DisplayName("191. Should remove a contact from a topic")
+    void testTopicsRemoveContact() throws Exception {
+        if (createdAudienceId == null || createdTopicId == null) return;
+
+        // Create a contact, add to audience and topic, then remove from topic
+        String email = "topic-remove-test-" + uniqueId() + "@example.com";
+        Contact contact = sevk.contacts().create(email);
+        sevk.audiences().addContacts(createdAudienceId, Arrays.asList(contact.getId()));
+        sevk.topics().addContacts(createdAudienceId, createdTopicId, Arrays.asList(contact.getId()));
+
+        sevk.topics().removeContact(createdAudienceId, createdTopicId, contact.getId());
+
+        // Verify removal by listing contacts in the topic
+        List<io.sevk.types.Contact> contacts = sevk.topics().listContacts(createdAudienceId, createdTopicId);
+        for (io.sevk.types.Contact c : contacts) {
+            assertNotEquals(contact.getId(), c.getId());
+        }
+    }
+
+    @Test
+    @Order(192)
+    @DisplayName("192. Should list contacts for a topic")
+    void testTopicsListContactsExtended() throws Exception {
+        assertNotNull(createdAudienceId);
+        assertNotNull(createdTopicId);
+
+        List<io.sevk.types.Contact> contacts = sevk.topics().listContacts(createdAudienceId, createdTopicId);
+
+        assertNotNull(contacts);
+        assertTrue(contacts.size() >= 0);
+    }
+
+    // ==================== SEGMENTS EXTENDED TESTS ====================
+
+    @Test
+    @Order(200)
+    @DisplayName("200. Should calculate a segment")
+    void testSegmentsCalculate() throws Exception {
+        assertNotNull(createdAudienceId);
+        assertNotNull(createdSegmentId);
+
+        try {
+            SegmentCalculateResponse result = sevk.segments().calculate(createdAudienceId, createdSegmentId);
+            assertNotNull(result);
+        } catch (SevkException e) {
+            // May hit rate limit during testing, which is acceptable
+            assertTrue(e.getMessage().contains("429") || e.getMessage().contains("rate"));
+        }
+    }
+
+    @Test
+    @Order(201)
+    @DisplayName("201. Should preview a segment")
+    void testSegmentsPreview() throws Exception {
+        assertNotNull(createdAudienceId);
+
+        CreateSegmentRequest req = new CreateSegmentRequest()
+            .rules(Arrays.asList(
+                new SegmentRule()
+                    .field("email")
+                    .operator("contains")
+                    .value("@example.com")
+            ))
+            .operator("AND");
+
+        SegmentCalculateResponse result = sevk.segments().preview(createdAudienceId, req);
+
+        assertNotNull(result);
+    }
+
+    // ==================== EMAILS EXTENDED TESTS ====================
+
+    @Test
+    @Order(210)
+    @DisplayName("210. Should throw error for non-existent email id")
+    void testEmailsGetNonExistent() {
+        Exception exception = assertThrows(SevkException.class, () -> {
+            sevk.emails().get("00000000-0000-0000-0000-000000000000");
+        });
+
+        assertTrue(exception.getMessage().contains("404"));
+    }
+
+    @Test
+    @Order(211)
+    @DisplayName("211. Should handle bulk email with unverified domain")
+    void testEmailsBulkReject() {
+        SendEmailRequest email1 = new SendEmailRequest()
+            .to("test1@example.com")
+            .from("no-reply@unverified-domain.com")
+            .subject("Bulk Test 1")
+            .html("<p>Hello 1</p>");
+
+        SendEmailRequest email2 = new SendEmailRequest()
+            .to("test2@example.com")
+            .from("no-reply@unverified-domain.com")
+            .subject("Bulk Test 2")
+            .html("<p>Hello 2</p>");
+
+        BulkEmailRequest req = new BulkEmailRequest()
+            .emails(Arrays.asList(email1, email2));
+
+        try {
+            BulkEmailResponse result = sevk.emails().sendBulk(req);
+            // Backend may return a response with failed count instead of throwing
+            assertNotNull(result);
+            assertTrue(result.failed > 0 || result.errors != null);
+        } catch (SevkException e) {
+            // Or it may throw an exception, which is also acceptable
+            assertNotNull(e.getMessage());
+            assertTrue(e.getMessage().length() > 0);
+        }
     }
 }

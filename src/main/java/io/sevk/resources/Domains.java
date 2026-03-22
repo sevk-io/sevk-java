@@ -33,6 +33,56 @@ public class Domains {
             queryParams.put("verified", verified.toString());
         }
         DomainListResponse response = client.get("/domains", queryParams, DomainListResponse.class);
-        return response != null && response.domains != null ? response.domains : java.util.Collections.emptyList();
+        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+    }
+
+    /**
+     * Get a domain by ID.
+     */
+    public Domain get(String id) {
+        return client.get("/domains/" + id, Domain.class);
+    }
+
+    /**
+     * Create a new domain.
+     */
+    public Domain create(CreateDomainRequest request) {
+        return client.post("/domains", request, Domain.class);
+    }
+
+    /**
+     * Update a domain.
+     */
+    public Domain update(String id, UpdateDomainRequest request) {
+        return client.put("/domains/" + id, request, Domain.class);
+    }
+
+    /**
+     * Delete a domain.
+     */
+    public void delete(String id) {
+        client.delete("/domains/" + id);
+    }
+
+    /**
+     * Trigger domain verification.
+     */
+    public Domain verify(String id) {
+        return client.post("/domains/" + id + "/verify", null, Domain.class);
+    }
+
+    /**
+     * Get DNS records for a domain.
+     */
+    public DnsRecordsResponse getDnsRecords(String id) {
+        return client.get("/domains/" + id + "/dns-records", DnsRecordsResponse.class);
+    }
+
+    /**
+     * Get available regions.
+     */
+    public List<String> getRegions() {
+        RegionListResponse response = client.get("/domains/regions", RegionListResponse.class);
+        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
     }
 }

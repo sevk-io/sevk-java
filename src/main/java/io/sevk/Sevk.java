@@ -1,5 +1,6 @@
 package io.sevk;
 
+import com.google.gson.JsonObject;
 import io.sevk.resources.*;
 
 /**
@@ -29,6 +30,8 @@ public class Sevk {
     private final Segments segments;
     private final Subscriptions subscriptions;
     private final Emails emails;
+    private final Webhooks webhooks;
+    private final Events events;
 
     /**
      * Create a new Sevk client with the given API key.
@@ -60,6 +63,8 @@ public class Sevk {
         this.segments = new Segments(client);
         this.subscriptions = new Subscriptions(client);
         this.emails = new Emails(client);
+        this.webhooks = new Webhooks(client);
+        this.events = new Events(client);
     }
 
     /**
@@ -141,5 +146,32 @@ public class Sevk {
      */
     public Emails emails() {
         return emails;
+    }
+
+    /**
+     * Get the Webhooks resource for managing webhooks.
+     *
+     * @return Webhooks resource
+     */
+    public Webhooks webhooks() {
+        return webhooks;
+    }
+
+    /**
+     * Get the Events resource for managing events.
+     *
+     * @return Events resource
+     */
+    public Events events() {
+        return events;
+    }
+
+    /**
+     * Get project usage and limits.
+     *
+     * @return Usage and limits data as a JsonObject
+     */
+    public JsonObject getUsage() {
+        return client.get("/limits", JsonObject.class);
     }
 }

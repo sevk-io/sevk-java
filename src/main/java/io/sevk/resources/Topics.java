@@ -65,4 +65,40 @@ public class Topics {
     public void delete(String audienceId, String topicId) {
         client.delete("/audiences/" + audienceId + "/topics/" + topicId);
     }
+
+    /**
+     * Add contacts to a topic.
+     */
+    public void addContacts(String audienceId, String topicId, List<String> contactIds) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("contactIds", contactIds);
+        client.post("/audiences/" + audienceId + "/topics/" + topicId + "/contacts", body, Void.class);
+    }
+
+    /**
+     * Remove a contact from a topic.
+     */
+    public void removeContact(String audienceId, String topicId, String contactId) {
+        client.delete("/audiences/" + audienceId + "/topics/" + topicId + "/contacts/" + contactId);
+    }
+
+    /**
+     * List contacts for a topic.
+     */
+    public List<io.sevk.types.Contact> listContacts(String audienceId, String topicId) {
+        return listContacts(audienceId, topicId, null);
+    }
+
+    /**
+     * List contacts for a topic with pagination.
+     */
+    public List<io.sevk.types.Contact> listContacts(String audienceId, String topicId, ListParams params) {
+        Map<String, String> queryParams = new HashMap<>();
+        if (params != null) {
+            if (params.page != null) queryParams.put("page", params.page.toString());
+            if (params.limit != null) queryParams.put("limit", params.limit.toString());
+        }
+        AudienceContactListResponse response = client.get("/audiences/" + audienceId + "/topics/" + topicId + "/contacts", queryParams, AudienceContactListResponse.class);
+        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+    }
 }

@@ -77,4 +77,39 @@ public class Contacts {
     public void delete(String id) {
         client.delete("/contacts/" + id);
     }
+
+    /**
+     * Bulk update contacts.
+     */
+    public BulkUpdateResponse bulkUpdate(List<BulkUpdateContactEntry> updates) {
+        BulkUpdateContactRequest request = new BulkUpdateContactRequest().contacts(updates);
+        return client.put("/contacts/bulk-update", request, BulkUpdateResponse.class);
+    }
+
+    /**
+     * Import contacts.
+     */
+    public ImportContactsResponse importContacts(ImportContactsRequest request) {
+        return client.post("/contacts/import", request, ImportContactsResponse.class);
+    }
+
+    /**
+     * Get events for a contact.
+     */
+    public List<ContactEvent> getEvents(String id) {
+        return getEvents(id, null);
+    }
+
+    /**
+     * Get events for a contact with pagination.
+     */
+    public List<ContactEvent> getEvents(String id, ListParams params) {
+        Map<String, String> queryParams = new HashMap<>();
+        if (params != null) {
+            if (params.page != null) queryParams.put("page", params.page.toString());
+            if (params.limit != null) queryParams.put("limit", params.limit.toString());
+        }
+        ContactEventListResponse response = client.get("/contacts/" + id + "/events", queryParams, ContactEventListResponse.class);
+        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+    }
 }

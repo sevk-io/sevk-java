@@ -1,7 +1,3 @@
-> [!WARNING]
-> Sevk is currently in private beta. This SDK is not yet available for public use.
-> Join the waitlist at [sevk.io](https://sevk.io) to get early access.
-
 <p align="center">
   <img src="https://sevk.io/logo.png" alt="Sevk" width="120" />
 </p>
@@ -25,14 +21,14 @@
 <dependency>
     <groupId>io.sevk</groupId>
     <artifactId>sevk-java</artifactId>
-    <version>0.1.0</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'io.sevk:sevk-java:0.1.0'
+implementation 'io.sevk:sevk-java:1.0.0'
 ```
 
 ## Send Email
@@ -59,14 +55,14 @@ public class Main {
 
 ```java
 import io.sevk.Sevk;
-import io.sevk.markup.MarkupRenderer;
+import io.sevk.markup.Renderer;
 import io.sevk.types.SendEmailRequest;
 
 public class Main {
     public static void main(String[] args) {
         Sevk sevk = new Sevk("your-api-key");
 
-        String html = MarkupRenderer.render("""
+        String html = Renderer.render("""
           <section padding="40px 20px" background-color="#f8f9fa">
             <container max-width="600px">
               <heading level="1" color="#1a1a1a">Welcome!</heading>

@@ -74,4 +74,31 @@ public class Audiences {
         body.put("contactIds", contactIds);
         client.post("/audiences/" + audienceId + "/contacts", body, Void.class);
     }
+
+    /**
+     * List contacts in an audience.
+     */
+    public List<io.sevk.types.Contact> listContacts(String audienceId) {
+        return listContacts(audienceId, null);
+    }
+
+    /**
+     * List contacts in an audience with pagination.
+     */
+    public List<io.sevk.types.Contact> listContacts(String audienceId, ListParams params) {
+        Map<String, String> queryParams = new HashMap<>();
+        if (params != null) {
+            if (params.page != null) queryParams.put("page", params.page.toString());
+            if (params.limit != null) queryParams.put("limit", params.limit.toString());
+        }
+        AudienceContactListResponse response = client.get("/audiences/" + audienceId + "/contacts", queryParams, AudienceContactListResponse.class);
+        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+    }
+
+    /**
+     * Remove a contact from an audience.
+     */
+    public void removeContact(String audienceId, String contactId) {
+        client.delete("/audiences/" + audienceId + "/contacts/" + contactId);
+    }
 }

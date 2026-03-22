@@ -28,9 +28,9 @@ Thumbs.db
 
 # Local configuration
 local.properties
-gradle.properties
 .env
 .env.local
 
 # Test output
 test-output/
+markup-output.html

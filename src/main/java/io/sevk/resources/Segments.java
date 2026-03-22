@@ -65,4 +65,18 @@ public class Segments {
     public void delete(String audienceId, String segmentId) {
         client.delete("/audiences/" + audienceId + "/segments/" + segmentId);
     }
+
+    /**
+     * Calculate a segment's matching contacts.
+     */
+    public SegmentCalculateResponse calculate(String audienceId, String segmentId) {
+        return client.get("/audiences/" + audienceId + "/segments/" + segmentId + "/calculate", SegmentCalculateResponse.class);
+    }
+
+    /**
+     * Preview how many contacts match given segment rules before saving.
+     */
+    public SegmentCalculateResponse preview(String audienceId, CreateSegmentRequest request) {
+        return client.post("/audiences/" + audienceId + "/segments/preview", request, SegmentCalculateResponse.class);
+    }
 }
