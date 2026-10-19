@@ -1,8 +1,32 @@
 package io.sevk.resources;
 
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
 import io.sevk.SevkClient;
-import io.sevk.types.Types.*;
-
+import io.sevk.types.ActiveBroadcastListResponse;
+import io.sevk.types.Broadcast;
+import io.sevk.types.BroadcastAnalytics;
+import io.sevk.types.BroadcastCancelResponse;
+import io.sevk.types.BroadcastCostEstimate;
+import io.sevk.types.BroadcastEmail;
+import io.sevk.types.BroadcastEmailListResponse;
+import io.sevk.types.BroadcastListResponse;
+import io.sevk.types.BroadcastRecipientEstimate;
+import io.sevk.types.BroadcastRecipientEstimateRequest;
+import io.sevk.types.BroadcastLifecycleStatus;
+import io.sevk.types.BroadcastStatus;
+import io.sevk.types.BroadcastSummary;
+import io.sevk.types.BroadcastWithVariants;
+import io.sevk.types.BroadcastUpdate;
+import io.sevk.types.CreateBroadcastRequest;
+import io.sevk.types.DeleteResponse;
+import io.sevk.types.ListBroadcastsParams;
+import io.sevk.types.ListParams;
+import io.sevk.types.PaginationParams;
+import io.sevk.types.SendTestRequest;
+import io.sevk.types.SendTestResponse;
+import io.sevk.types.UpdateBroadcastRequest;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,128 +42,230 @@ public class Broadcasts {
     }
 
     /**
-     * List all broadcasts.
+     * Lists broadcasts using default pagination.
      */
-    public List<Broadcast> list() {
+    public BroadcastListResponse list() {
         return list(null);
     }
 
     /**
-     * List broadcasts with pagination.
+     * Lists broadcasts with optional pagination, search, and status filters.
      */
-    public List<Broadcast> list(ListParams params) {
+    public BroadcastListResponse list(ListParams params) {
         Map<String, String> queryParams = new HashMap<>();
+
         if (params != null) {
-            if (params.page != null) queryParams.put("page", params.page.toString());
-            if (params.limit != null) queryParams.put("limit", params.limit.toString());
-            if (params.search != null) queryParams.put("search", params.search);
+            if (params.page != null) {
+                queryParams.put("page", params.page.toString());
+            }
+            if (params.limit != null) {
+                queryParams.put("limit", params.limit.toString());
+            }
+            if (params.search != null) {
+                queryParams.put("search", params.search);
+            }
+            if (params.after != null) {
+                queryParams.put("after", params.after);
+            }
+            if (params.before != null) {
+                queryParams.put("before", params.before);
+            }
+
+            if (params instanceof ListBroadcastsParams) {
+                BroadcastLifecycleStatus status = ((ListBroadcastsParams) params).status;
+
+                if (status != null) {
+                    queryParams.put("status", status.name());
+                }
+            }
         }
-        BroadcastListResponse response = client.get("/broadcasts", queryParams, BroadcastListResponse.class);
-        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+
+        return client.get("/broadcasts", queryParams, BroadcastListResponse.class);
     }
 
     /**
-     * Get a broadcast by ID.
+     * Retrieves a broadcast by ID and includes its delivery state.
      */
     public Broadcast get(String id) {
         return client.get("/broadcasts/" + id, Broadcast.class);
     }
 
     /**
-     * Create a new broadcast.
+     * Creates a draft or scheduled broadcast for a target group.
      */
-    public Broadcast create(CreateBroadcastRequest request) {
-        return client.post("/broadcasts", request, Broadcast.class);
+    public BroadcastWithVariants create(CreateBroadcastRequest request) {
+        return client.post("/broadcasts", request, BroadcastWithVariants.class);
     }
 
     /**
-     * Update a broadcast.
+     * Updates a broadcast while preserving omitted fields.
      */
-    public Broadcast update(String id, UpdateBroadcastRequest request) {
-        return client.put("/broadcasts/" + id, request, Broadcast.class);
+    public BroadcastUpdate update(String id, UpdateBroadcastRequest request) {
+        if (request == null) {
+            return client.put("/broadcasts/" + id, null, BroadcastUpdate.class);
+        }
+
+        JsonObject body = client.serializeObject(request);
+
+        if (request.isReplyToSet() && request.replyTo == null) {
+            body.add("replyTo", JsonNull.INSTANCE);
+        }
+        if (request.isScheduledAtSet() && request.scheduledAt == null) {
+            body.add("scheduledAt", JsonNull.INSTANCE);
+        }
+        if (request.isOpenTrackingSet() && request.openTracking == null) {
+            body.add("openTracking", JsonNull.INSTANCE);
+        }
+        if (request.isClickTrackingSet() && request.clickTracking == null) {
+            body.add("clickTracking", JsonNull.INSTANCE);
+        }
+        if (request.isVariantsSet() && request.variants == null) {
+            body.add("variants", JsonNull.INSTANCE);
+        }
+        if (request.isAbTestSet() && request.abTest == null) {
+            body.add("abTest", JsonNull.INSTANCE);
+        }
+        if (request.isAudienceIdSet() && request.audienceId == null) {
+            body.add("audienceId", JsonNull.INSTANCE);
+        }
+        if (request.isTopicIdSet() && request.topicId == null) {
+            body.add("topicId", JsonNull.INSTANCE);
+        }
+        if (request.isSegmentIdSet() && request.segmentId == null) {
+            body.add("segmentId", JsonNull.INSTANCE);
+        }
+
+        return client.put("/broadcasts/" + id, body, BroadcastUpdate.class);
     }
 
     /**
-     * Delete a broadcast.
+     * Deletes a broadcast that has not been sent.
      */
-    public void delete(String id) {
-        client.delete("/broadcasts/" + id);
+    public DeleteResponse delete(String id) {
+        return client.delete("/broadcasts/" + id, DeleteResponse.class);
     }
 
     /**
-     * Send a broadcast.
+     * Queues a prepared broadcast for delivery.
      */
-    public Broadcast send(String id) {
-        return client.post("/broadcasts/" + id + "/send", null, Broadcast.class);
+    public BroadcastSummary send(String id) {
+        return client.post("/broadcasts/" + id + "/send", null, BroadcastSummary.class);
     }
 
     /**
-     * Send a broadcast with scheduling options.
+     * Cancels a broadcast when its state still allows cancellation.
      */
-    public Broadcast send(String id, SendBroadcastRequest request) {
-        return client.post("/broadcasts/" + id + "/send", request, Broadcast.class);
+    public BroadcastCancelResponse cancel(String id) {
+        return client.post("/broadcasts/" + id + "/cancel", null, BroadcastCancelResponse.class);
     }
 
     /**
-     * Cancel a scheduled broadcast.
+     * Sends a broadcast to test recipients without starting the campaign.
      */
-    public Broadcast cancel(String id) {
-        return client.post("/broadcasts/" + id + "/cancel", null, Broadcast.class);
+    public SendTestResponse test(String id, SendTestRequest request) {
+        return test(id, request, null);
     }
 
     /**
-     * Send a test email for a broadcast.
+     * Sends a broadcast to test recipients with optional retry idempotency.
      */
-    public void sendTest(String id, SendTestRequest request) {
-        client.post("/broadcasts/" + id + "/test", request, Void.class);
+    public SendTestResponse test(String id, SendTestRequest request, TestOptions options) {
+        return client.post(
+            "/broadcasts/" + id + "/test",
+            request,
+            SendTestResponse.class,
+            idempotencyHeaders(options)
+        );
+    }
+
+    private static Map<String, String> idempotencyHeaders(TestOptions options) {
+        if (options == null || options.idempotencyKey == null) {
+            return null;
+        }
+
+        return Collections.singletonMap("Idempotency-Key", options.idempotencyKey);
+    }
+
+    /** Per-call options for a retry-safe broadcast test send. */
+    public static class TestOptions {
+        public String idempotencyKey;
+
+        public TestOptions idempotencyKey(String key) {
+            this.idempotencyKey = key;
+            return this;
+        }
     }
 
     /**
-     * Get broadcast analytics.
+     * Returns aggregate delivery and engagement analytics for a broadcast.
      */
-    public BroadcastAnalytics getAnalytics(String id) {
+    public BroadcastAnalytics analytics(String id) {
         return client.get("/broadcasts/" + id + "/analytics", BroadcastAnalytics.class);
     }
 
     /**
-     * Get broadcast status.
+     * Returns live scheduling and delivery progress for a broadcast.
      */
-    public BroadcastStatus getStatus(String id) {
+    public BroadcastStatus status(String id) {
         return client.get("/broadcasts/" + id + "/status", BroadcastStatus.class);
     }
 
     /**
-     * Get broadcast emails.
+     * Lists email deliveries created for a broadcast using default pagination.
      */
-    public List<BroadcastEmail> getEmails(String id) {
-        return getEmails(id, null);
+    public BroadcastEmailListResponse emails(String id) {
+        return emails(id, null);
     }
 
     /**
-     * Get broadcast emails with pagination.
+     * Lists email deliveries created for a broadcast with pagination.
      */
-    public List<BroadcastEmail> getEmails(String id, ListParams params) {
+    public BroadcastEmailListResponse emails(String id, PaginationParams params) {
         Map<String, String> queryParams = new HashMap<>();
+
         if (params != null) {
-            if (params.page != null) queryParams.put("page", params.page.toString());
-            if (params.limit != null) queryParams.put("limit", params.limit.toString());
+            if (params.page != null) {
+                queryParams.put("page", params.page.toString());
+            }
+            if (params.limit != null) {
+                queryParams.put("limit", params.limit.toString());
+            }
+            if (params.after != null) {
+                queryParams.put("after", params.after);
+            }
+            if (params.before != null) {
+                queryParams.put("before", params.before);
+            }
         }
-        BroadcastEmailListResponse response = client.get("/broadcasts/" + id + "/emails", queryParams, BroadcastEmailListResponse.class);
-        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+
+        return client.get("/broadcasts/" + id + "/emails", queryParams, BroadcastEmailListResponse.class);
+    }
+
+    /** Returns only email items from the selected broadcast page. */
+    public List<BroadcastEmail> emailItems(String id, PaginationParams params) {
+        BroadcastEmailListResponse response = emails(id, params);
+
+        return response != null && response.items != null ? response.items : Collections.emptyList();
     }
 
     /**
-     * Estimate broadcast cost.
+     * Estimates delivery cost without sending the broadcast.
      */
     public BroadcastCostEstimate estimateCost(String id) {
         return client.get("/broadcasts/" + id + "/estimate-cost", BroadcastCostEstimate.class);
     }
 
     /**
-     * List active broadcasts.
+     * Resolves the subscribed recipient count for a broadcast target.
      */
-    public List<Broadcast> listActive() {
-        BroadcastListResponse response = client.get("/broadcasts/active", BroadcastListResponse.class);
-        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+    public BroadcastRecipientEstimate estimateRecipients(BroadcastRecipientEstimateRequest request) {
+        return client.post("/broadcasts/estimate-recipients", request, BroadcastRecipientEstimate.class);
+    }
+
+    /**
+     * Lists broadcasts that are currently scheduled or processing.
+     */
+    public ActiveBroadcastListResponse active() {
+        return client.get("/broadcasts/active", ActiveBroadcastListResponse.class);
     }
 }

@@ -1,10 +1,16 @@
 package io.sevk.resources;
 
 import io.sevk.SevkClient;
-import io.sevk.types.Types.*;
-
+import io.sevk.types.CreateSegmentRequest;
+import io.sevk.types.DeleteResponse;
+import io.sevk.types.ListParams;
+import io.sevk.types.PreviewSegmentRequest;
+import io.sevk.types.PreviewSegmentResponse;
+import io.sevk.types.Segment;
+import io.sevk.types.SegmentCalculateResponse;
+import io.sevk.types.SegmentListResponse;
+import io.sevk.types.UpdateSegmentRequest;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,65 +24,78 @@ public class Segments {
     }
 
     /**
-     * List all segments for an audience.
+     * Lists segments belonging to an audience using default pagination.
      */
-    public List<Segment> list(String audienceId) {
+    public SegmentListResponse list(String audienceId) {
         return list(audienceId, null);
     }
 
     /**
-     * List segments with pagination.
+     * Lists segments belonging to an audience with optional filtering.
      */
-    public List<Segment> list(String audienceId, ListParams params) {
+    public SegmentListResponse list(String audienceId, ListParams params) {
         Map<String, String> queryParams = new HashMap<>();
+
         if (params != null) {
-            if (params.page != null) queryParams.put("page", params.page.toString());
-            if (params.limit != null) queryParams.put("limit", params.limit.toString());
-            if (params.search != null) queryParams.put("search", params.search);
+            if (params.page != null) {
+                queryParams.put("page", params.page.toString());
+            }
+            if (params.limit != null) {
+                queryParams.put("limit", params.limit.toString());
+            }
+            if (params.search != null) {
+                queryParams.put("search", params.search);
+            }
+            if (params.after != null) {
+                queryParams.put("after", params.after);
+            }
+            if (params.before != null) {
+                queryParams.put("before", params.before);
+            }
         }
-        SegmentListResponse response = client.get("/audiences/" + audienceId + "/segments", queryParams, SegmentListResponse.class);
-        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+
+        return client.get("/audiences/" + audienceId + "/segments", queryParams, SegmentListResponse.class);
     }
 
     /**
-     * Get a segment by ID.
-     */
-    public Segment get(String audienceId, String segmentId) {
-        return client.get("/audiences/" + audienceId + "/segments/" + segmentId, Segment.class);
-    }
-
-    /**
-     * Create a new segment.
+     * Creates a saved contact segment under an audience.
      */
     public Segment create(String audienceId, CreateSegmentRequest request) {
         return client.post("/audiences/" + audienceId + "/segments", request, Segment.class);
     }
 
     /**
-     * Update a segment.
+     * Evaluates segment rules and returns matches without saving a segment.
      */
-    public Segment update(String audienceId, String segmentId, UpdateSegmentRequest request) {
-        return client.put("/audiences/" + audienceId + "/segments/" + segmentId, request, Segment.class);
+    public PreviewSegmentResponse preview(String audienceId, PreviewSegmentRequest request) {
+        return client.post("/audiences/" + audienceId + "/segments/preview", request, PreviewSegmentResponse.class);
     }
 
     /**
-     * Delete a segment.
+     * Retrieves a saved segment by ID.
      */
-    public void delete(String audienceId, String segmentId) {
-        client.delete("/audiences/" + audienceId + "/segments/" + segmentId);
+    public Segment get(String segmentId) {
+        return client.get("/segments/" + segmentId, Segment.class);
     }
 
     /**
-     * Calculate a segment's matching contacts.
+     * Updates a segment while preserving omitted fields.
      */
-    public SegmentCalculateResponse calculate(String audienceId, String segmentId) {
-        return client.get("/audiences/" + audienceId + "/segments/" + segmentId + "/calculate", SegmentCalculateResponse.class);
+    public Segment update(String segmentId, UpdateSegmentRequest request) {
+        return client.put("/segments/" + segmentId, request, Segment.class);
     }
 
     /**
-     * Preview how many contacts match given segment rules before saving.
+     * Deletes a segment without deleting any contacts.
      */
-    public SegmentCalculateResponse preview(String audienceId, CreateSegmentRequest request) {
-        return client.post("/audiences/" + audienceId + "/segments/preview", request, SegmentCalculateResponse.class);
+    public DeleteResponse delete(String segmentId) {
+        return client.delete("/segments/" + segmentId, DeleteResponse.class);
+    }
+
+    /**
+     * Recalculates and returns the current matching contact count.
+     */
+    public SegmentCalculateResponse calculate(String segmentId) {
+        return client.get("/segments/" + segmentId + "/calculate", SegmentCalculateResponse.class);
     }
 }

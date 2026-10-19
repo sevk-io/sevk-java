@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="https://sevk.io/logo.png" alt="Sevk" width="120" />
+  <img src="https://sevk.io/logo.png" alt="sevk" width="120" />
 </p>
 
-<h1 align="center">Sevk Java SDK</h1>
+<h1 align="center">sevk Java SDK</h1>
 
 <p align="center">
-  Official Java SDK for <a href="https://sevk.io">Sevk</a> email platform.
+  Official Java SDK for <a href="https://sevk.io">sevk</a> email platform.
 </p>
 
 <p align="center">
@@ -15,20 +15,22 @@
 
 ## Installation
 
+Requires Java 11 or later.
+
 ### Maven
 
 ```xml
 <dependency>
     <groupId>io.sevk</groupId>
     <artifactId>sevk-java</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'io.sevk:sevk-java:1.0.0'
+implementation 'io.sevk:sevk-java:1.1.0'
 ```
 
 ## Send Email
@@ -44,7 +46,7 @@ public class Main {
         sevk.emails().send(new SendEmailRequest()
             .to("recipient@example.com")
             .from("hello@yourdomain.com")
-            .subject("Hello from Sevk!")
+            .subject("Hello from sevk!")
             .html("<h1>Welcome!</h1>")
         );
     }
@@ -62,17 +64,14 @@ public class Main {
     public static void main(String[] args) {
         Sevk sevk = new Sevk("your-api-key");
 
-        String html = Renderer.render("""
-          <section padding="40px 20px" background-color="#f8f9fa">
-            <container max-width="600px">
-              <heading level="1" color="#1a1a1a">Welcome!</heading>
-              <paragraph color="#666666">Thanks for signing up.</paragraph>
-              <button href="https://example.com" background-color="#5227FF" color="#ffffff" padding="12px 24px">
-                Get Started
-              </button>
-            </container>
-          </section>
-        """);
+        String html = Renderer.render(
+            "<section padding=\"40px 20px\" background-color=\"#f8f9fa\">" +
+            "<container max-width=\"600px\">" +
+            "<heading level=\"1\" color=\"#1a1a1a\">Welcome!</heading>" +
+            "<paragraph color=\"#666666\">Thanks for signing up.</paragraph>" +
+            "<button href=\"https://example.com\" background-color=\"#5227FF\" color=\"#ffffff\" padding=\"12px 24px\">" +
+            "Get Started</button></container></section>"
+        );
 
         sevk.emails().send(new SendEmailRequest()
             .to("recipient@example.com")
