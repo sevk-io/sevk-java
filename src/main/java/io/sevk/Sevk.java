@@ -1,13 +1,25 @@
 package io.sevk;
 
-import com.google.gson.JsonObject;
-import io.sevk.resources.*;
+import io.sevk.resources.Activity;
+import io.sevk.resources.Audiences;
+import io.sevk.resources.Broadcasts;
+import io.sevk.resources.Contacts;
+import io.sevk.resources.Domains;
+import io.sevk.resources.Emails;
+import io.sevk.resources.Inbound;
+import io.sevk.resources.Outbound;
+import io.sevk.resources.Segments;
+import io.sevk.resources.Subscriptions;
+import io.sevk.resources.Templates;
+import io.sevk.resources.Topics;
+import io.sevk.resources.Usage;
+import io.sevk.resources.Webhooks;
 
 /**
- * Sevk Java SDK - Official Java client for the Sevk email platform.
+ * sevk Java SDK - Official Java client for the sevk email platform.
  *
  * <pre>{@code
- * Sevk sevk = new Sevk("your-api-key");
+ * Sevk sevk = new Sevk("sevk_your_api_key");
  *
  * // Send an email
  * SendEmailRequest request = new SendEmailRequest()
@@ -16,11 +28,10 @@ import io.sevk.resources.*;
  *     .subject("Hello!")
  *     .html("<h1>Hello World!</h1>");
  *
- * Email email = sevk.emails().send(request);
+ * SendEmailResponse response = sevk.emails().send(request);
  * }</pre>
  */
 public class Sevk {
-    private final SevkClient client;
     private final Contacts contacts;
     private final Audiences audiences;
     private final Templates templates;
@@ -31,29 +42,28 @@ public class Sevk {
     private final Subscriptions subscriptions;
     private final Emails emails;
     private final Webhooks webhooks;
-    private final Events events;
+    private final Activity activity;
+    private final Inbound inbound;
+    private final Outbound outbound;
+    private final Usage usage;
 
     /**
-     * Create a new Sevk client with the given API key.
+     * Create a new sevk client with the given API key.
      *
-     * @param apiKey Your Sevk API key
+     * @param apiKey Your sevk API key
      */
     public Sevk(String apiKey) {
         this(apiKey, new SevkOptions());
     }
 
     /**
-     * Create a new Sevk client with the given API key and options.
+     * Create a new sevk client with the given API key and options.
      *
-     * @param apiKey  Your Sevk API key
+     * @param apiKey  Your sevk API key
      * @param options Configuration options
      */
     public Sevk(String apiKey, SevkOptions options) {
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            throw new SevkException("API key is required", 401, "invalid_api_key");
-        }
-
-        this.client = new SevkClient(apiKey, options);
+        SevkClient client = new SevkClient(apiKey, options);
         this.contacts = new Contacts(client);
         this.audiences = new Audiences(client);
         this.templates = new Templates(client);
@@ -64,7 +74,10 @@ public class Sevk {
         this.subscriptions = new Subscriptions(client);
         this.emails = new Emails(client);
         this.webhooks = new Webhooks(client);
-        this.events = new Events(client);
+        this.activity = new Activity(client);
+        this.inbound = new Inbound(client);
+        this.outbound = new Outbound(client);
+        this.usage = new Usage(client);
     }
 
     /**
@@ -158,20 +171,42 @@ public class Sevk {
     }
 
     /**
-     * Get the Events resource for managing events.
+     * Get the Activity resource for retrieving the activity audit log.
      *
-     * @return Events resource
+     * @return Activity resource
      */
-    public Events events() {
-        return events;
+    public Activity activity() {
+        return activity;
     }
 
     /**
-     * Get project usage and limits.
+     * Get the Inbound resource for reading incoming mail and managing
+     * inbound routes, blocklist, quota, and per-domain security.
      *
-     * @return Usage and limits data as a JsonObject
+     * @return Inbound resource
      */
-    public JsonObject getUsage() {
-        return client.get("/limits", JsonObject.class);
+    public Inbound inbound() {
+        return inbound;
     }
+
+    /**
+     * Get the Outbound resource for managing the project's outbound
+     * monthly cap and pause / resume state.
+     *
+     * @return Outbound resource
+     */
+    public Outbound outbound() {
+        return outbound;
+    }
+
+    /**
+     * Get the Usage resource for reading project plan caps, balance,
+     * outbound price, resource counters, and email send-limit stats.
+     *
+     * @return Usage resource
+     */
+    public Usage usage() {
+        return usage;
+    }
+
 }

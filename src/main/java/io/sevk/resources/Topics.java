@@ -1,8 +1,19 @@
 package io.sevk.resources;
 
 import io.sevk.SevkClient;
-import io.sevk.types.Types.*;
-
+import io.sevk.types.AddContactsToTopicResponse;
+import io.sevk.types.AudienceContactListResponse;
+import io.sevk.types.Contact;
+import io.sevk.types.CreateTopicRequest;
+import io.sevk.types.DeleteResponse;
+import io.sevk.types.ListParams;
+import io.sevk.types.ListTopicContactsParams;
+import io.sevk.types.RemoveTopicContactResponse;
+import io.sevk.types.Topic;
+import io.sevk.types.TopicListResponse;
+import io.sevk.types.TopicMutationResponse;
+import io.sevk.types.UpdateTopicRequest;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,87 +29,126 @@ public class Topics {
     }
 
     /**
-     * List all topics for an audience.
+     * Lists topics belonging to an audience using default pagination.
      */
-    public List<Topic> list(String audienceId) {
+    public TopicListResponse list(String audienceId) {
         return list(audienceId, null);
     }
 
     /**
-     * List topics with pagination.
+     * Lists topics belonging to an audience with optional filtering.
      */
-    public List<Topic> list(String audienceId, ListParams params) {
+    public TopicListResponse list(String audienceId, ListParams params) {
         Map<String, String> queryParams = new HashMap<>();
+
         if (params != null) {
-            if (params.page != null) queryParams.put("page", params.page.toString());
-            if (params.limit != null) queryParams.put("limit", params.limit.toString());
-            if (params.search != null) queryParams.put("search", params.search);
+            if (params.page != null) {
+                queryParams.put("page", params.page.toString());
+            }
+            if (params.limit != null) {
+                queryParams.put("limit", params.limit.toString());
+            }
+            if (params.search != null) {
+                queryParams.put("search", params.search);
+            }
+            if (params.after != null) {
+                queryParams.put("after", params.after);
+            }
+            if (params.before != null) {
+                queryParams.put("before", params.before);
+            }
         }
-        TopicListResponse response = client.get("/audiences/" + audienceId + "/topics", queryParams, TopicListResponse.class);
-        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+
+        return client.get("/audiences/" + audienceId + "/topics", queryParams, TopicListResponse.class);
     }
 
     /**
-     * Get a topic by ID.
+     * Creates a subscription topic under an audience.
      */
-    public Topic get(String audienceId, String topicId) {
-        return client.get("/audiences/" + audienceId + "/topics/" + topicId, Topic.class);
+    public TopicMutationResponse create(String audienceId, CreateTopicRequest request) {
+        return client.post("/audiences/" + audienceId + "/topics", request, TopicMutationResponse.class);
     }
 
     /**
-     * Create a new topic.
+     * Retrieves a topic by ID.
      */
-    public Topic create(String audienceId, CreateTopicRequest request) {
-        return client.post("/audiences/" + audienceId + "/topics", request, Topic.class);
+    public Topic get(String topicId) {
+        return client.get("/topics/" + topicId, Topic.class);
     }
 
     /**
-     * Update a topic.
+     * Updates a topic while preserving omitted fields.
      */
-    public Topic update(String audienceId, String topicId, UpdateTopicRequest request) {
-        return client.put("/audiences/" + audienceId + "/topics/" + topicId, request, Topic.class);
+    public TopicMutationResponse update(String topicId, UpdateTopicRequest request) {
+        return client.put("/topics/" + topicId, request, TopicMutationResponse.class);
     }
 
     /**
-     * Delete a topic.
+     * Deletes a topic without deleting its contacts or parent audience.
      */
-    public void delete(String audienceId, String topicId) {
-        client.delete("/audiences/" + audienceId + "/topics/" + topicId);
+    public DeleteResponse delete(String topicId) {
+        return client.delete("/topics/" + topicId, DeleteResponse.class);
     }
 
     /**
-     * Add contacts to a topic.
+     * Adds contacts to a topic, ignoring existing memberships.
      */
-    public void addContacts(String audienceId, String topicId, List<String> contactIds) {
+    public AddContactsToTopicResponse addContacts(String topicId, List<String> contactIds) {
         Map<String, Object> body = new HashMap<>();
+
         body.put("contactIds", contactIds);
-        client.post("/audiences/" + audienceId + "/topics/" + topicId + "/contacts", body, Void.class);
+
+        return client.post("/topics/" + topicId + "/contacts", body, AddContactsToTopicResponse.class);
     }
 
     /**
-     * Remove a contact from a topic.
+     * Removes a contact from a topic without deleting it.
      */
-    public void removeContact(String audienceId, String topicId, String contactId) {
-        client.delete("/audiences/" + audienceId + "/topics/" + topicId + "/contacts/" + contactId);
+    public RemoveTopicContactResponse removeContact(String topicId, String contactId) {
+        return client.delete("/topics/" + topicId + "/contacts/" + contactId, RemoveTopicContactResponse.class);
     }
 
     /**
-     * List contacts for a topic.
+     * Lists contacts attached to a topic using default pagination.
      */
-    public List<io.sevk.types.Contact> listContacts(String audienceId, String topicId) {
-        return listContacts(audienceId, topicId, null);
+    public AudienceContactListResponse listContacts(String topicId) {
+        return listContacts(topicId, null);
     }
 
     /**
-     * List contacts for a topic with pagination.
+     * Lists contacts attached to a topic with optional filtering.
      */
-    public List<io.sevk.types.Contact> listContacts(String audienceId, String topicId, ListParams params) {
+    public AudienceContactListResponse listContacts(String topicId, ListTopicContactsParams params) {
         Map<String, String> queryParams = new HashMap<>();
+
         if (params != null) {
-            if (params.page != null) queryParams.put("page", params.page.toString());
-            if (params.limit != null) queryParams.put("limit", params.limit.toString());
+            if (params.page != null) {
+                queryParams.put("page", params.page.toString());
+            }
+            if (params.limit != null) {
+                queryParams.put("limit", params.limit.toString());
+            }
+            if (params.search != null) {
+                queryParams.put("search", params.search);
+            }
+            if (params.after != null) {
+                queryParams.put("after", params.after);
+            }
+            if (params.before != null) {
+                queryParams.put("before", params.before);
+            }
+            if (params.subscribed != null) {
+                queryParams.put("subscribed", params.subscribed.toString());
+            }
         }
-        AudienceContactListResponse response = client.get("/audiences/" + audienceId + "/topics/" + topicId + "/contacts", queryParams, AudienceContactListResponse.class);
-        return response != null && response.items != null ? response.items : java.util.Collections.emptyList();
+
+        return client.get("/topics/" + topicId + "/contacts", queryParams, AudienceContactListResponse.class);
+    }
+
+    /** Returns only contact items from the selected topic page. */
+    public List<Contact> listContactItems(String topicId, ListTopicContactsParams params) {
+        AudienceContactListResponse response = listContacts(topicId, params);
+
+        return response != null && response.items != null ? response.items : Collections.emptyList();
     }
 }

@@ -1,7 +1,10 @@
 package io.sevk.resources;
 
 import io.sevk.SevkClient;
-import io.sevk.types.Types.*;
+import io.sevk.types.SubscribeRequest;
+import io.sevk.types.SubscribeResponse;
+import io.sevk.types.UnsubscribeRequest;
+import io.sevk.types.UnsubscribeResponse;
 
 public class Subscriptions {
     private final SevkClient client;
@@ -10,11 +13,14 @@ public class Subscriptions {
         this.client = client;
     }
 
-    public void subscribe(SubscribeRequest req) {
-        client.post("/subscriptions/subscribe", req, Void.class);
+    /** Subscribes a contact and optionally adds it to an audience. */
+    public SubscribeResponse subscribe(SubscribeRequest req) {
+        return client.post("/subscriptions/subscribe", req, SubscribeResponse.class);
     }
 
-    public void unsubscribe(UnsubscribeRequest req) {
-        client.post("/subscriptions/unsubscribe", req, Void.class);
+    /** Globally unsubscribes a contact and optionally attributes the action. */
+    public UnsubscribeResponse unsubscribe(UnsubscribeRequest req) {
+
+        return client.post("/subscriptions/unsubscribe", req, UnsubscribeResponse.class);
     }
 }

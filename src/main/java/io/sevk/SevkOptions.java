@@ -1,7 +1,7 @@
 package io.sevk;
 
 /**
- * Configuration options for the Sevk client.
+ * Configuration options for the sevk client.
  */
 public class SevkOptions {
     private String baseUrl = "https://api.sevk.io";

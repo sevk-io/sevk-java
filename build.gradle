@@ -1,12 +1,12 @@
 plugins {
     id 'java-library'
-    id 'application'
     id 'maven-publish'
     id 'signing'
+    id 'net.thebugmc.gradle.sonatype-central-portal-publisher' version '1.2.4'
 }
 
 group = 'io.sevk'
-version = '1.0.0'
+version = '1.1.0'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -15,28 +15,49 @@ java {
     withSourcesJar()
 }
 
+
+configurations {
+    bundledHighlight
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.addAll(['-Xlint:all', '-Werror'])
+}
+
+processResources {
+    filesMatching('io/sevk/sevk-version.properties') {
+        expand(version: project.version)
+    }
+}
+
 repositories {
     mavenCentral()
-    maven { url 'https://jitpack.io' }
+    maven { url = uri('https://jitpack.io') }
 }
 
 dependencies {
-    // HTTP Client
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-
-    // JSON Processing
-    implementation 'com.google.code.gson:gson:2.10.1'
-
-    // JSoup for HTML parsing (markup renderer)
-    implementation 'org.jsoup:jsoup:1.17.2'
-
-    // Syntax highlighting for code blocks
-    implementation 'com.github.Codewaves:Highlight.java:1.0.2'
-
-    // Testing
+    implementation 'com.fifesoft:rsyntaxtextarea:3.5.3'
+    api 'com.google.code.gson:gson:2.10.1'
+    compileOnly 'com.github.Codewaves:Highlight.java:1.0.2'
+    bundledHighlight 'com.github.Codewaves:Highlight.java:1.0.2'
+    testImplementation 'com.github.Codewaves:Highlight.java:1.0.2'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
-    testImplementation 'org.mockito:mockito-core:5.8.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('jar') {
+    from {
+        configurations.bundledHighlight.collect { dependency -> zipTree(dependency) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+    from('THIRD_PARTY_LICENSES/Highlight.java-LICENSE.txt') {
+        into 'META-INF/licenses'
+    }
+    from('LICENSE') {
+        into 'META-INF'
+    }
 }
 
 test {
@@ -48,61 +69,48 @@ test {
     }
 }
 
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
+centralPortal {
+    username = findProperty('ossrhUsername') ?: System.getenv('OSSRH_USERNAME')
+    password = findProperty('ossrhPassword') ?: System.getenv('OSSRH_PASSWORD')
 
-            pom {
-                name = 'Sevk Java SDK'
-                description = 'Official Java SDK for the Sevk email platform'
-                url = 'https://github.com/sevk-io/sevk-java'
+    pom {
+        name = 'Sevk Java SDK'
+        description = 'Official Java SDK for the Sevk email platform'
+        url = 'https://github.com/sevk-io/sevk-java'
 
-                licenses {
-                    license {
-                        name = 'MIT License'
-                        url = 'https://opensource.org/licenses/MIT'
-                    }
-                }
-
-                developers {
-                    developer {
-                        id = 'sevk'
-                        name = 'Sevk Team'
-                        email = 'support@sevk.io'
-                    }
-                }
-
-                scm {
-                    connection = 'scm:git:git://github.com/sevk-io/sevk-java.git'
-                    developerConnection = 'scm:git:ssh://github.com/sevk-io/sevk-java.git'
-                    url = 'https://github.com/sevk-io/sevk-java'
-                }
+        licenses {
+            license {
+                name = 'MIT License'
+                url = 'https://opensource.org/licenses/MIT'
             }
         }
-    }
 
-    repositories {
-        maven {
-            name = 'OSSRH'
-            url = uri('https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/')
-            credentials {
-                username = findProperty('ossrhUsername') ?: System.getenv('OSSRH_USERNAME')
-                password = findProperty('ossrhPassword') ?: System.getenv('OSSRH_PASSWORD')
+        developers {
+            developer {
+                id = 'sevk'
+                name = 'Sevk Team'
+                email = 'support@sevk.io'
             }
+        }
+
+        scm {
+            connection = 'scm:git:git://github.com/sevk-io/sevk-java.git'
+            developerConnection = 'scm:git:ssh://github.com/sevk-io/sevk-java.git'
+            url = 'https://github.com/sevk-io/sevk-java'
         }
     }
 }
 
 signing {
-    sign publishing.publications.mavenJava
+    def signingKey = findProperty('signingKey') ?: System.getenv('GPG_PRIVATE_KEY')
+    def signingKeyId = findProperty('signingKeyId')
+    def signingPassword = findProperty('signingPassword')
+    if (signingKey) {
+        useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+    }
+    sign publishing.publications
 }
 
 tasks.withType(Javadoc) {
     options.addStringOption('Xdoclint:none', '-quiet')
-}
-
-// Application plugin configuration for running test classes
-application {
-    mainClass = project.findProperty('mainClass') ?: 'io.sevk.TestMarkupOutput'
 }
